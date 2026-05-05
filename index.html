@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#0f0f1a">
+  <meta name="description" content="OPI – Aplikacja do szybkiego dokumentowania obchodów technicznych">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="OPI">
+  <title>OPI – Obchód Techniczny</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ======================== START SCREEN ======================== -->
+  <div id="screen-start" class="screen active">
+    <div class="start-header">
+      <div class="logo-icon">🔧</div>
+      <h1>OPI</h1>
+      <p class="subtitle">Obchód Techniczny</p>
+    </div>
+
+    <div class="start-form">
+      <div class="form-group">
+        <label for="building-input">Budynek *</label>
+        <div class="combo-box">
+          <input type="text" id="building-input" placeholder="Wpisz lub wybierz budynek" autocomplete="off">
+          <div id="building-suggestions" class="suggestions hidden"></div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="department-select">Dział *</label>
+        <select id="department-select">
+          <option value="Elektryka">⚡ Elektryka</option>
+          <option value="HVAC">❄️ HVAC</option>
+          <option value="Hydraulika">💧 Hydraulika</option>
+          <option value="Inne">🔧 Inne</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="zone-input">Strefa / Skrzydło <span class="optional">(opcjonalne)</span></label>
+        <input type="text" id="zone-input" placeholder="np. A, Północ, Skrzydło B">
+      </div>
+
+      <button id="btn-start" class="btn btn-primary btn-xl">
+        ▶ Rozpocznij obchód
+      </button>
+
+      <div id="saved-session-banner" class="saved-banner hidden">
+        <p>⚠️ Znaleziono niezakończoną sesję</p>
+        <div class="saved-banner-actions">
+          <button id="btn-resume" class="btn btn-secondary">↩ Wznów sesję</button>
+          <button id="btn-discard" class="btn btn-danger-outline">🗑 Usuń</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================== CAMERA SCREEN ======================== -->
+  <div id="screen-camera" class="screen">
+    <div class="top-bar">
+      <button id="btn-to-gallery" class="icon-btn" title="Podgląd sesji">
+        <span class="icon">📁</span>
+        <span id="photo-count-badge" class="badge">0</span>
+      </button>
+      <div class="session-info">
+        <span id="session-building" class="session-building">Budynek</span>
+        <span id="session-dept" class="session-dept">Dział</span>
+      </div>
+      <button id="btn-end-session" class="icon-btn icon-btn--danger" title="Zakończ obchód">🏁</button>
+    </div>
+
+    <div id="preview-area" class="preview-area">
+      <div id="no-photo-msg" class="no-photo-msg">
+        <span class="big-icon">📷</span>
+        <p>Gotowy do dokumentowania</p>
+        <p class="hint">Naciśnij przycisk poniżej</p>
+      </div>
+      <img id="photo-preview" class="photo-preview hidden" alt="Podgląd">
+      <video id="camera-stream" class="camera-stream hidden" autoplay playsinline muted></video>
+    </div>
+
+    <div class="camera-actions">
+      <button id="btn-flip" class="icon-btn-round" title="Przełącz kamerę">🔄</button>
+      <button id="btn-capture" class="btn-capture">📸</button>
+      <button id="btn-file-fallback" class="icon-btn-round" title="Wybierz z pliku">🖼</button>
+      <input type="file" id="file-input" accept="image/*" capture="environment" class="hidden">
+    </div>
+
+    <div id="camera-tip" class="camera-tip">Dotknij 📸 aby zrobić zdjęcie</div>
+
+    <div id="photo-form" class="photo-form hidden">
+      <div class="form-row">
+        <div class="form-group flex-1">
+          <label for="room-input">Pomieszczenie</label>
+          <input type="text" id="room-input" placeholder="np. Serwerownia" autocomplete="off">
+          <div id="room-suggestions" class="suggestions hidden"></div>
+        </div>
+        <div class="form-group w-20">
+          <label for="floor-input">Piętro</label>
+          <input type="text" id="floor-input" placeholder="2">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="short-desc">Krótki opis * <span class="hint-inline">(pojawi się na zdjęciu)</span></label>
+        <input type="text" id="short-desc" placeholder="np. wyciek, uszkodzona lampa, brak osłony">
+      </div>
+
+      <div class="form-group">
+        <label for="long-desc">Szczegółowy opis <span class="optional">(opcjonalny)</span></label>
+        <textarea id="long-desc" rows="2" placeholder="Dodatkowe informacje do raportu..."></textarea>
+      </div>
+
+      <div class="form-actions">
+        <button id="btn-delete-photo" class="btn btn-danger-outline">❌ Usuń</button>
+        <button id="btn-save-photo" class="btn btn-primary btn-xl">✅ Zapisz i następne</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================== GALLERY SCREEN ======================== -->
+  <div id="screen-gallery" class="screen">
+    <div class="top-bar">
+      <button id="btn-back-to-camera" class="icon-btn">← Wróć</button>
+      <h2 class="top-bar-title">Podgląd sesji</h2>
+      <span id="gallery-count" class="gallery-count">0 zdjęć</span>
+    </div>
+
+    <div id="gallery-empty" class="gallery-empty hidden">
+      <span class="big-icon">📂</span>
+      <p>Brak zdjęć w sesji</p>
+    </div>
+
+    <div id="gallery-grid" class="gallery-grid"></div>
+
+    <div class="export-bar">
+      <button id="btn-copy-mail" class="btn btn-secondary">📧 Kopiuj do maila</button>
+      <button id="btn-export-zip" class="btn btn-primary">📦 Zakończ i pobierz ZIP</button>
+    </div>
+  </div>
+
+  <!-- ======================== EDIT MODAL ======================== -->
+  <div id="edit-modal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modal-title">Edytuj zdjęcie</h3>
+        <button id="btn-close-modal" class="icon-btn">✕</button>
+      </div>
+      <div class="modal-body">
+        <img id="modal-preview" class="modal-preview" alt="Podgląd zdjęcia">
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label for="edit-room">Pomieszczenie</label>
+            <input type="text" id="edit-room">
+          </div>
+          <div class="form-group w-20">
+            <label for="edit-floor">Piętro</label>
+            <input type="text" id="edit-floor">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="edit-short-desc">Krótki opis</label>
+          <input type="text" id="edit-short-desc">
+        </div>
+        <div class="form-group">
+          <label for="edit-long-desc">Szczegółowy opis</label>
+          <textarea id="edit-long-desc" rows="3"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-modal-delete" class="btn btn-danger">🗑 Usuń zdjęcie</button>
+        <button id="btn-modal-save" class="btn btn-primary">💾 Zapisz zmiany</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================== TOAST ======================== -->
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" integrity="sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxkDCHOELLmPFZzmptMQdUiS6a6Qe+iuvLkiPSRJCzS5b2VLm2fnuLnw==" crossorigin="anonymous"></script>
+  <script src="app.js"></script>
+</body>
+</html>
