@@ -110,6 +110,17 @@
       </div>
 
       <div class="form-group">
+        <label for="category-select">Kategoria usterki</label>
+        <select id="category-select">
+          <option value="Awaria">🔴 Awaria</option>
+          <option value="Usterka">🟠 Usterka</option>
+          <option value="Uwaga">🟡 Uwaga</option>
+          <option value="Do kontroli">🔵 Do kontroli</option>
+          <option value="Inne">⚪ Inne</option>
+        </select>
+      </div>
+
+      <div class="form-group">
         <label for="short-desc">Krótki opis * <span class="hint-inline">(pojawi się na zdjęciu)</span></label>
         <input type="text" id="short-desc" placeholder="np. wyciek, uszkodzona lampa, brak osłony">
       </div>
@@ -167,6 +178,16 @@
           </div>
         </div>
         <div class="form-group">
+          <label for="edit-category">Kategoria usterki</label>
+          <select id="edit-category">
+            <option value="Awaria">🔴 Awaria</option>
+            <option value="Usterka">🟠 Usterka</option>
+            <option value="Uwaga">🟡 Uwaga</option>
+            <option value="Do kontroli">🔵 Do kontroli</option>
+            <option value="Inne">⚪ Inne</option>
+          </select>
+        </div>
+        <div class="form-group">
           <label for="edit-short-desc">Krótki opis</label>
           <input type="text" id="edit-short-desc">
         </div>
@@ -185,7 +206,7 @@
   <!-- ======================== TOAST ======================== -->
   <div id="toast" class="toast hidden"></div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" integrity="sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxkDCHOELLmPFZzmptMQdUiS6a6Qe+iuvLkiPSRJCzS5b2VLm2fnuLnw==" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script src="app.js"></script>
 </body>
 </html>

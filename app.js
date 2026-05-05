@@ -276,6 +276,7 @@ function resetForm(keepFloor) {
   $('room-input').value = '';
   $('short-desc').value = '';
   $('long-desc').value  = '';
+  $('category-select').value = 'Usterka';
   if (!keepFloor) $('floor-input').value = '';
   $('photo-form').classList.add('hidden');
   $('photo-preview').classList.add('hidden');
@@ -322,13 +323,13 @@ function processImageNoOverlay(dataUrl) {
 }
 
 function drawOverlay(ctx, w, h, d) {
-  const { number, building, floor, room, shortDesc, timestamp } = d;
+  const { number, building, floor, room, shortDesc, category, timestamp } = d;
   const lines = [
     `Zdjęcie ${number}`,
     `Budynek: ${building}`,
     `Piętro: ${floor || '—'}`,
     `Pom.: ${room || '—'}`,
-    shortDesc || '—',
+    `[${category || 'Usterka'}] ${shortDesc || '—'}`,
     fmtDT(timestamp),
   ];
   const fs = Math.max(12, Math.min(18, Math.floor(w / 70)));
@@ -361,12 +362,13 @@ async function savePhoto() {
     const floor    = $('floor-input').value.trim();
     const room     = $('room-input').value.trim();
     const longDesc = $('long-desc').value.trim();
+    const category = $('category-select').value;
     const now      = new Date().toISOString();
     const num      = S.photoCount + 1;
 
     showLoading('Przetwarzanie zdjęcia...');
 
-    const overlayData = { number: num, building: S.session.building, floor, room, shortDesc, timestamp: now };
+    const overlayData = { number: num, building: S.session.building, floor, room, shortDesc, category, timestamp: now };
     const [processedBlob, originalBlob] = await Promise.all([
       processImage(S.currentDataUrl, overlayData),
       processImageNoOverlay(S.currentDataUrl),
@@ -380,7 +382,7 @@ async function savePhoto() {
       building: S.session.building,
       department: S.session.department,
       zone: S.session.zone,
-      floor, room, shortDesc, longDesc,
+      floor, room, shortDesc, longDesc, category,
       timestamp: now,
       filename,
       processedBlob,
@@ -461,6 +463,7 @@ async function openEditModal(id) {
   $('modal-preview').src          = editPreviewUrl;
   $('edit-room').value            = p.room || '';
   $('edit-floor').value           = p.floor || '';
+  $('edit-category').value        = p.category || 'Usterka';
   $('edit-short-desc').value      = p.shortDesc || '';
   $('edit-long-desc').value       = p.longDesc || '';
   $('edit-modal').classList.remove('hidden');
@@ -477,11 +480,12 @@ async function saveEdit() {
   try {
     p.room      = $('edit-room').value.trim();
     p.floor     = $('edit-floor').value.trim();
+    p.category  = $('edit-category').value;
     p.shortDesc = $('edit-short-desc').value.trim();
     p.longDesc  = $('edit-long-desc').value.trim();
 
     const orig = editPreviewUrl; // Use already created URL
-    const overlayData = { number: p.number, building: p.building, floor: p.floor, room: p.room, shortDesc: p.shortDesc, timestamp: p.timestamp };
+    const overlayData = { number: p.number, building: p.building, floor: p.floor, room: p.room, shortDesc: p.shortDesc, category: p.category, timestamp: p.timestamp };
     p.processedBlob = await processImage(orig, overlayData);
     await idb.put('photos', p);
     $('edit-modal').classList.add('hidden');
@@ -564,6 +568,7 @@ function genTxt(photos) {
     r += `Zdjęcie ${p.number}\n`;
     r += `Pomieszczenie: ${p.room || '—'}\n`;
     r += `Piętro: ${p.floor || '—'}\n`;
+    r += `Kategoria: ${p.category || 'Usterka'}\n`;
     r += `Krótki opis: ${p.shortDesc}\n`;
     if (p.longDesc) r += `Szczegółowy opis: ${p.longDesc}\n`;
     r += `Data: ${fmtDT(p.timestamp)}\n\n`;
@@ -579,6 +584,7 @@ function genHtml(photos) {
       <table>
         <tr><td>Pomieszczenie</td><td>${escHtml(p.room) || '—'}</td></tr>
         <tr><td>Piętro</td><td>${escHtml(p.floor) || '—'}</td></tr>
+        <tr><td>Kategoria</td><td>${escHtml(p.category) || 'Usterka'}</td></tr>
         <tr><td>Krótki opis</td><td>${escHtml(p.shortDesc)}</td></tr>
         ${p.longDesc ? `<tr><td>Szczegółowy opis</td><td>${escHtml(p.longDesc)}</td></tr>` : ''}
         <tr><td>Data</td><td>${fmtDT(p.timestamp)}</td></tr>
@@ -615,7 +621,7 @@ async function copyMailReport() {
   photos.sort((a, b) => a.number - b.number);
 
   const text = photos.map(p => {
-    let line = `Zdjęcie ${p.number} – ${p.shortDesc} (${p.room || '—'}, piętro ${p.floor || '—'})`;
+    let line = `Zdjęcie ${p.number} – [${p.category || 'Usterka'}] ${p.shortDesc} (${p.room || '—'}, piętro ${p.floor || '—'})`;
     if (p.longDesc) line += `\nSzczegóły: ${p.longDesc}`;
     return line;
   }).join('\n\n');
