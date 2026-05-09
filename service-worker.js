@@ -1,4 +1,5 @@
-const CACHE = 'opi-v1';
+const CACHE = 'opi-v2';
+const MAX_CACHE_SIZE = 50;
 const ASSETS = [
   './',
   './index.html',
@@ -23,12 +24,33 @@ self.addEventListener('activate', e => {
   ).then(() => self.clients.claim()));
 });
 
+// Limit cache size to prevent storage abuse
+async function trimCache(cacheName, maxItems) {
+  const cache = await caches.open(cacheName);
+  const keys = await cache.keys();
+  if (keys.length > maxItems) {
+    await cache.delete(keys[0]);
+    return trimCache(cacheName, maxItems);
+  }
+}
+
 self.addEventListener('fetch', e => {
+  const url = new URL(e.request.url);
+
+  // Only cache GET requests from same origin or trusted CDNs
+  if (e.request.method !== 'GET') return;
+  const trusted = [self.location.origin, 'https://cdnjs.cloudflare.com', 'https://fonts.googleapis.com', 'https://fonts.gstatic.com'];
+  if (!trusted.some(t => url.href.startsWith(t))) return;
+
   e.respondWith(
     caches.match(e.request).then(cached => cached || fetch(e.request).then(res => {
-      if (!res || res.status !== 200 || res.type === 'opaque') return res;
+      if (!res || res.status !== 200) return res;
+      if (res.type === 'opaque') return res;
       const clone = res.clone();
-      caches.open(CACHE).then(c => c.put(e.request, clone));
+      caches.open(CACHE).then(c => {
+        c.put(e.request, clone);
+        trimCache(CACHE, MAX_CACHE_SIZE);
+      });
       return res;
     }).catch(() => cached))
   );

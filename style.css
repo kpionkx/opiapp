@@ -218,6 +218,34 @@ textarea {
 .flex-1 { flex: 1; min-width: 0; }
 .w-20 { width: 80px; flex-shrink: 0; }
 
+/* ---- Chip group (branch selector) ---- */
+.chip-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.chip {
+  background: var(--surface2);
+  border: 1.5px solid var(--border);
+  border-radius: 20px;
+  color: var(--text-2);
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 7px 14px;
+  cursor: pointer;
+  transition: all var(--transition);
+  white-space: nowrap;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.chip:active { transform: scale(0.95); }
+.chip.active {
+  background: rgba(37, 99, 235, 0.2);
+  border-color: var(--accent);
+  color: var(--accent-l);
+}
+
 /* ============================================
    BUTTONS
    ============================================ */
@@ -246,6 +274,12 @@ textarea {
   font-size: 17px;
   border-radius: var(--radius-lg);
   width: 100%;
+}
+
+.btn-sm {
+  padding: 8px 14px;
+  font-size: 13px;
+  border-radius: var(--radius-sm);
 }
 
 .btn-primary {
@@ -429,6 +463,62 @@ textarea {
   object-fit: cover;
 }
 
+/* ---- Zoom controls ---- */
+.zoom-controls {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  z-index: 10;
+}
+.zoom-label {
+  background: rgba(0,0,0,0.6);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 12px;
+}
+.zoom-slider {
+  writing-mode: vertical-lr;
+  direction: rtl;
+  width: 30px;
+  height: 140px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* ---- Lens bar ---- */
+.lens-bar {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: rgba(0,0,0,0.85);
+  flex-shrink: 0;
+}
+.lens-btn {
+  background: rgba(255,255,255,0.1);
+  border: 1.5px solid rgba(255,255,255,0.2);
+  border-radius: 20px;
+  color: rgba(255,255,255,0.7);
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 16px;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.lens-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
 /* ============================================
    CAMERA ACTIONS
    ============================================ */
@@ -481,12 +571,15 @@ textarea {
   overflow-y: auto;
   flex-shrink: 0;
   max-height: 55vh;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .form-actions {
   display: flex;
   gap: 10px;
-  margin-top: 12px;
+  margin-top: 4px;
 }
 .form-actions .btn-primary { flex: 2; }
 .form-actions .btn-danger-outline { flex: 1; }
@@ -568,6 +661,19 @@ textarea {
   white-space: nowrap;
 }
 
+/* Gallery item category badge */
+.gallery-item-cat {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(0,0,0,0.7);
+  color: var(--accent-l);
+}
+
 .export-bar {
   display: flex;
   gap: 10px;
@@ -631,6 +737,7 @@ textarea {
   object-fit: contain;
   max-height: 180px;
   background: #000;
+  cursor: pointer;
 }
 
 .modal-footer {
@@ -642,6 +749,106 @@ textarea {
   padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
 }
 .modal-footer .btn { flex: 1; }
+
+/* ============================================
+   LIGHTBOX (fullscreen photo viewer)
+   ============================================ */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: #000;
+  display: flex;
+  flex-direction: column;
+  animation: fadeIn 0.2s ease;
+}
+.lightbox.hidden { display: none !important; }
+
+.lightbox-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: rgba(0,0,0,0.6);
+  flex-shrink: 0;
+}
+.lightbox-title {
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+}
+.lightbox-close {
+  background: rgba(255,255,255,0.15);
+  border: none;
+  color: #fff;
+  font-size: 20px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+.lightbox-close:hover { background: rgba(255,255,255,0.3); }
+
+.lightbox-body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  min-height: 0;
+}
+.lightbox-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.lightbox-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0,0,0,0.5);
+  border: none;
+  color: #fff;
+  font-size: 32px;
+  width: 44px;
+  height: 64px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  transition: background 0.15s;
+  z-index: 5;
+}
+.lightbox-nav:hover { background: rgba(0,0,0,0.8); }
+.lightbox-nav--left { left: 8px; }
+.lightbox-nav--right { right: 8px; }
+
+.lightbox-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: rgba(0,0,0,0.6);
+  flex-shrink: 0;
+  padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+}
+.lightbox-counter {
+  color: rgba(255,255,255,0.7);
+  font-size: 13px;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
 
 /* ============================================
    TOAST

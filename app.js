@@ -47,6 +47,10 @@ const S = {
   stream: null,
   facing: 'environment',
   editId: null,
+  branch: 'Elektryka',
+  zoomLevel: 1,
+  lightboxPhotos: [],
+  lightboxIdx: 0,
 };
 
 // ── UTILS ─────────────────────────────────────────────────────────────
@@ -110,14 +114,13 @@ function updateCounter() {
 
 // ── BUILDINGS ────────────────────────────────────────────────────────
 async function loadBuildings() {
-  const list = await idb.getAll('buildings');
   const inp = $('building-input');
   const sug = $('building-suggestions');
 
   async function show(q = '') {
     const list = await idb.getAll('buildings');
     const f = q ? list.filter(b => b.name.toLowerCase().includes(q)) : list;
-    sug.innerHTML = '';
+    sug.replaceChildren();
     if (!f.length) { sug.classList.add('hidden'); return; }
     f.forEach(b => {
       const d = document.createElement('div');
@@ -149,7 +152,7 @@ async function initRoomAutocomplete() {
   inp.addEventListener('input', () => {
     const q = inp.value.trim().toLowerCase();
     const f = cachedRooms.filter(r => r.name.toLowerCase().includes(q)).slice(0, 6);
-    sug.innerHTML = '';
+    sug.replaceChildren();
     if (!f.length || !q) { sug.classList.add('hidden'); return; }
     f.forEach(r => {
       const d = document.createElement('div');
@@ -196,7 +199,7 @@ async function startCamera() {
   stopCamera();
   try {
     S.stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: S.facing, width: { ideal: 1280 } },
+      video: { facingMode: S.facing, width: { ideal: 1920 }, height: { ideal: 1080 } },
       audio: false
     });
     video.srcObject = S.stream;
@@ -206,9 +209,42 @@ async function startCamera() {
     camTip.textContent = 'Dotknij 📸 aby zrobić zdjęcie';
     $('btn-capture').classList.remove('recording');
     S.cameraActive = true;
+    S.zoomLevel = 1;
+    initZoom();
   } catch {
     useFallback();
   }
+}
+
+function initZoom() {
+  const track = S.stream && S.stream.getVideoTracks()[0];
+  if (!track) { $('zoom-controls').classList.add('hidden'); $('lens-bar').classList.add('hidden'); return; }
+  const caps = track.getCapabilities ? track.getCapabilities() : {};
+  if (caps.zoom) {
+    const slider = $('zoom-slider');
+    slider.min = caps.zoom.min;
+    slider.max = Math.min(caps.zoom.max, 10);
+    slider.step = caps.zoom.step || 0.1;
+    slider.value = caps.zoom.min;
+    $('zoom-label').textContent = '1.0×';
+    $('zoom-controls').classList.remove('hidden');
+    $('lens-bar').classList.remove('hidden');
+  } else {
+    $('zoom-controls').classList.add('hidden');
+    $('lens-bar').classList.add('hidden');
+  }
+}
+
+function applyZoom(val) {
+  const track = S.stream && S.stream.getVideoTracks()[0];
+  if (!track) return;
+  try { track.applyConstraints({ advanced: [{ zoom: val }] }); } catch {}
+  S.zoomLevel = val;
+  $('zoom-label').textContent = Number(val).toFixed(1) + '×';
+  $('zoom-slider').value = val;
+  document.querySelectorAll('.lens-btn').forEach(b => {
+    b.classList.toggle('active', parseFloat(b.dataset.zoom) === parseFloat(val));
+  });
 }
 
 function stopCamera() {
@@ -216,6 +252,8 @@ function stopCamera() {
   video.classList.add('hidden');
   video.srcObject = null;
   S.cameraActive = false;
+  $('zoom-controls').classList.add('hidden');
+  $('lens-bar').classList.add('hidden');
 }
 
 function useFallback() {
@@ -284,14 +322,41 @@ function resetForm(keepFloor) {
   $('no-photo-msg').classList.remove('hidden');
   camTip.textContent = 'Dotknij 📸 aby zrobić zdjęcie';
   S.currentDataUrl = null;
+  // keep branch selection
+}
+
+// ── CHIP SELECTOR ─────────────────────────────────────────────────────
+function initChips(containerId, onChange) {
+  const container = $(containerId);
+  if (!container) return;
+  container.addEventListener('click', e => {
+    const chip = e.target.closest('.chip');
+    if (!chip) return;
+    container.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    if (onChange) onChange(chip.dataset.value);
+  });
+}
+
+function getChipValue(containerId) {
+  const el = document.querySelector('#' + containerId + ' .chip.active');
+  return el ? el.dataset.value : 'Elektryka';
+}
+
+function setChipValue(containerId, val) {
+  const container = $(containerId);
+  if (!container) return;
+  container.querySelectorAll('.chip').forEach(c => {
+    c.classList.toggle('active', c.dataset.value === val);
+  });
 }
 
 // ── CANVAS PROCESSING ────────────────────────────────────────────────
 function processImage(dataUrl, overlayData) {
-  return new Promise(res => {
+  return new Promise((res, rej) => {
     const img = new Image();
     img.onload = () => {
-      const MAX = 1280;
+      const MAX = 1920;
       let w = img.width, h = img.height;
       if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
       const canvas = document.createElement('canvas');
@@ -302,15 +367,16 @@ function processImage(dataUrl, overlayData) {
       drawOverlay(ctx, w, h, overlayData);
       canvas.toBlob(blob => res(blob), 'image/jpeg', 0.85);
     };
+    img.onerror = () => rej(new Error('Nie udało się załadować obrazu'));
     img.src = dataUrl;
   });
 }
 
 function processImageNoOverlay(dataUrl) {
-  return new Promise(res => {
+  return new Promise((res, rej) => {
     const img = new Image();
     img.onload = () => {
-      const MAX = 1280;
+      const MAX = 1920;
       let w = img.width, h = img.height;
       if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
       const c = document.createElement('canvas');
@@ -318,33 +384,46 @@ function processImageNoOverlay(dataUrl) {
       c.getContext('2d').drawImage(img, 0, 0, w, h);
       c.toBlob(b => res(b), 'image/jpeg', 0.85);
     };
+    img.onerror = () => rej(new Error('Nie udało się załadować obrazu'));
     img.src = dataUrl;
   });
 }
 
 function drawOverlay(ctx, w, h, d) {
-  const { number, building, floor, room, shortDesc, category, timestamp } = d;
+  const { number, building, floor, room, shortDesc, category, branch, timestamp } = d;
   const lines = [
-    `Zdjęcie ${number}`,
-    `Budynek: ${building}`,
-    `Piętro: ${floor || '—'}`,
-    `Pom.: ${room || '—'}`,
-    `[${category || 'Usterka'}] ${shortDesc || '—'}`,
+    `#${number} | ${building}`,
+    `Piętro: ${floor || '—'} | Pom.: ${room || '—'}`,
+    `[${branch || ''}] [${category || 'Usterka'}]`,
+    shortDesc || '—',
     fmtDT(timestamp),
   ];
-  const fs = Math.max(12, Math.min(18, Math.floor(w / 70)));
-  ctx.font = `${fs}px Arial, sans-serif`;
-  const pad = 8, lh = fs * 1.45;
-  const bw = lines.reduce((m, l) => Math.max(m, ctx.measureText(l).width), 0) + pad * 2;
-  const bh = lines.length * lh + pad * 2;
-  const bx = w - bw - pad;
-  const by = h - bh - pad;
-  ctx.fillStyle = 'rgba(0,0,0,0.72)';
-  ctx.fillRect(bx, by, bw, bh);
+  const fs = Math.max(16, Math.min(26, Math.floor(w / 45)));
+  ctx.font = `bold ${fs}px 'Inter', Arial, sans-serif`;
+  const pd = 12, lh = fs * 1.5;
+  const bw = lines.reduce((m, l) => Math.max(m, ctx.measureText(l).width), 0) + pd * 2;
+  const bh = lines.length * lh + pd * 2;
+  const bx = w - bw - pd;
+  const by = h - bh - pd;
+  ctx.fillStyle = 'rgba(0,0,0,0.78)';
+  const r = 8;
+  ctx.beginPath();
+  if (ctx.roundRect) {
+    ctx.roundRect(bx, by, bw, bh, r);
+  } else {
+    ctx.moveTo(bx + r, by);
+    ctx.arcTo(bx + bw, by, bx + bw, by + bh, r);
+    ctx.arcTo(bx + bw, by + bh, bx, by + bh, r);
+    ctx.arcTo(bx, by + bh, bx, by, r);
+    ctx.arcTo(bx, by, bx + bw, by, r);
+    ctx.closePath();
+  }
+  ctx.fill();
   ctx.fillStyle = '#2563eb';
-  ctx.fillRect(bx, by, bw, 3);
+  ctx.fillRect(bx, by, bw, 4);
   ctx.fillStyle = '#fff';
-  lines.forEach((l, i) => ctx.fillText(l, bx + pad, by + pad + (i + 1) * lh - (lh - fs) * 0.5));
+  ctx.font = `600 ${fs}px 'Inter', Arial, sans-serif`;
+  lines.forEach((l, i) => ctx.fillText(l, bx + pd, by + pd + (i + 1) * lh - (lh - fs) * 0.5));
 }
 
 // ── SAVE PHOTO ────────────────────────────────────────────────────────
@@ -363,12 +442,13 @@ async function savePhoto() {
     const room     = $('room-input').value.trim();
     const longDesc = $('long-desc').value.trim();
     const category = $('category-select').value;
+    const branch   = getChipValue('branch-chips');
     const now      = new Date().toISOString();
     const num      = S.photoCount + 1;
 
     showLoading('Przetwarzanie zdjęcia...');
 
-    const overlayData = { number: num, building: S.session.building, floor, room, shortDesc, category, timestamp: now };
+    const overlayData = { number: num, building: S.session.building, floor, room, shortDesc, category, branch, timestamp: now };
     const [processedBlob, originalBlob] = await Promise.all([
       processImage(S.currentDataUrl, overlayData),
       processImageNoOverlay(S.currentDataUrl),
@@ -382,7 +462,7 @@ async function savePhoto() {
       building: S.session.building,
       department: S.session.department,
       zone: S.session.zone,
-      floor, room, shortDesc, longDesc, category,
+      floor, room, shortDesc, longDesc, category, branch,
       timestamp: now,
       filename,
       processedBlob,
@@ -421,12 +501,14 @@ async function loadGallery() {
   const grid  = $('gallery-grid');
   const empty = $('gallery-empty');
   $('gallery-count').textContent = `${photos.length} zdjęć`;
-  grid.innerHTML = '';
+  grid.replaceChildren();
 
   if (!photos.length) { empty.classList.remove('hidden'); return; }
   empty.classList.add('hidden');
 
-  photos.forEach(p => {
+  S.lightboxPhotos = photos;
+
+  photos.forEach((p, idx) => {
     const item = document.createElement('div');
     item.className = 'gallery-item';
     const url = URL.createObjectURL(p.originalBlob);
@@ -444,11 +526,43 @@ async function loadGallery() {
     const label = document.createElement('span');
     label.className = 'gallery-item-label';
     label.textContent = p.shortDesc || '';
+
+    const cat = document.createElement('span');
+    cat.className = 'gallery-item-cat';
+    cat.textContent = p.branch || '';
     
-    item.append(img, num, label);
-    item.addEventListener('click', () => openEditModal(p.id));
+    item.append(img, num, cat, label);
+    item.addEventListener('click', () => openLightbox(idx));
     grid.appendChild(item);
   });
+}
+
+// ── LIGHTBOX ──────────────────────────────────────────────────────────
+function openLightbox(idx) {
+  S.lightboxIdx = idx;
+  renderLightbox();
+  $('lightbox').classList.remove('hidden');
+}
+
+function renderLightbox() {
+  const photos = S.lightboxPhotos;
+  if (!photos.length) return;
+  const p = photos[S.lightboxIdx];
+  const url = URL.createObjectURL(p.originalBlob);
+  const prev = $('lightbox-img').dataset.blobUrl;
+  if (prev) URL.revokeObjectURL(prev);
+  $('lightbox-img').src = url;
+  $('lightbox-img').dataset.blobUrl = url;
+  $('lightbox-title').textContent = `#${p.number} – ${p.shortDesc || ''}`;
+  $('lightbox-counter').textContent = `${S.lightboxIdx + 1} / ${photos.length}`;
+  $('lightbox-prev').style.visibility = S.lightboxIdx > 0 ? 'visible' : 'hidden';
+  $('lightbox-next').style.visibility = S.lightboxIdx < photos.length - 1 ? 'visible' : 'hidden';
+}
+
+function closeLightbox() {
+  $('lightbox').classList.add('hidden');
+  const prev = $('lightbox-img').dataset.blobUrl;
+  if (prev) { URL.revokeObjectURL(prev); delete $('lightbox-img').dataset.blobUrl; }
 }
 
 async function openEditModal(id) {
@@ -466,6 +580,7 @@ async function openEditModal(id) {
   $('edit-category').value        = p.category || 'Usterka';
   $('edit-short-desc').value      = p.shortDesc || '';
   $('edit-long-desc').value       = p.longDesc || '';
+  setChipValue('edit-branch-chips', p.branch || 'Elektryka');
   $('edit-modal').classList.remove('hidden');
 }
 
@@ -483,9 +598,10 @@ async function saveEdit() {
     p.category  = $('edit-category').value;
     p.shortDesc = $('edit-short-desc').value.trim();
     p.longDesc  = $('edit-long-desc').value.trim();
+    p.branch    = getChipValue('edit-branch-chips');
 
-    const orig = editPreviewUrl; // Use already created URL
-    const overlayData = { number: p.number, building: p.building, floor: p.floor, room: p.room, shortDesc: p.shortDesc, category: p.category, timestamp: p.timestamp };
+    const orig = editPreviewUrl;
+    const overlayData = { number: p.number, building: p.building, floor: p.floor, room: p.room, shortDesc: p.shortDesc, category: p.category, branch: p.branch, timestamp: p.timestamp };
     p.processedBlob = await processImage(orig, overlayData);
     await idb.put('photos', p);
     $('edit-modal').classList.add('hidden');
@@ -566,6 +682,7 @@ function genTxt(photos) {
   r += '\n----------------------------------\n\n';
   photos.forEach(p => {
     r += `Zdjęcie ${p.number}\n`;
+    r += `Branża: ${p.branch || '—'}\n`;
     r += `Pomieszczenie: ${p.room || '—'}\n`;
     r += `Piętro: ${p.floor || '—'}\n`;
     r += `Kategoria: ${p.category || 'Usterka'}\n`;
@@ -582,6 +699,7 @@ function genHtml(photos) {
     <div class="photo-entry">
       <h2>Zdjęcie ${p.number} – ${escHtml(p.shortDesc)}</h2>
       <table>
+        <tr><td>Branża</td><td>${escHtml(p.branch) || '—'}</td></tr>
         <tr><td>Pomieszczenie</td><td>${escHtml(p.room) || '—'}</td></tr>
         <tr><td>Piętro</td><td>${escHtml(p.floor) || '—'}</td></tr>
         <tr><td>Kategoria</td><td>${escHtml(p.category) || 'Usterka'}</td></tr>
@@ -686,6 +804,16 @@ function bindEvents() {
     startCamera();
   });
 
+  // Zoom
+  $('zoom-slider').addEventListener('input', e => applyZoom(parseFloat(e.target.value)));
+  document.querySelectorAll('.lens-btn').forEach(btn => {
+    btn.addEventListener('click', () => applyZoom(parseFloat(btn.dataset.zoom)));
+  });
+
+  // Chips
+  initChips('branch-chips', v => { S.branch = v; });
+  initChips('edit-branch-chips');
+
   $('btn-to-gallery').addEventListener('click', async () => {
     stopCamera();
     await loadGallery();
@@ -711,6 +839,19 @@ function bindEvents() {
   $('btn-modal-save').addEventListener('click', saveEdit);
   $('btn-modal-delete').addEventListener('click', () => deletePhoto(S.editId));
   $('edit-modal').addEventListener('click', e => { if (e.target === $('edit-modal')) $('edit-modal').classList.add('hidden'); });
+  $('modal-preview').addEventListener('click', () => {
+    if (S.editId != null) {
+      const idx = S.lightboxPhotos.findIndex(p => p.id === S.editId);
+      if (idx >= 0) openLightbox(idx);
+    }
+  });
+
+  // Lightbox
+  $('btn-close-lightbox').addEventListener('click', closeLightbox);
+  $('lightbox-prev').addEventListener('click', () => { if (S.lightboxIdx > 0) { S.lightboxIdx--; renderLightbox(); } });
+  $('lightbox-next').addEventListener('click', () => { if (S.lightboxIdx < S.lightboxPhotos.length - 1) { S.lightboxIdx++; renderLightbox(); } });
+  $('lightbox-edit').addEventListener('click', () => { closeLightbox(); const p = S.lightboxPhotos[S.lightboxIdx]; if (p) openEditModal(p.id); });
+  $('lightbox').addEventListener('click', e => { if (e.target === $('lightbox') || e.target.classList.contains('lightbox-body')) closeLightbox(); });
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────

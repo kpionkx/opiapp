@@ -85,6 +85,19 @@
       </div>
       <img id="photo-preview" class="photo-preview hidden" alt="Podgląd">
       <video id="camera-stream" class="camera-stream hidden" autoplay playsinline muted></video>
+
+      <!-- Zoom slider overlay -->
+      <div id="zoom-controls" class="zoom-controls hidden">
+        <span class="zoom-label" id="zoom-label">1.0×</span>
+        <input type="range" id="zoom-slider" class="zoom-slider" min="1" max="5" step="0.1" value="1">
+      </div>
+    </div>
+
+    <!-- Lens selector bar -->
+    <div id="lens-bar" class="lens-bar hidden">
+      <button class="lens-btn active" data-zoom="0.5">0.5×</button>
+      <button class="lens-btn" data-zoom="1">1×</button>
+      <button class="lens-btn" data-zoom="2">2×</button>
     </div>
 
     <div class="camera-actions">
@@ -97,6 +110,20 @@
     <div id="camera-tip" class="camera-tip">Dotknij 📸 aby zrobić zdjęcie</div>
 
     <div id="photo-form" class="photo-form hidden">
+
+      <!-- Category quick-select chips (Branża) -->
+      <div class="form-group">
+        <label>Branża</label>
+        <div id="branch-chips" class="chip-group">
+          <button class="chip active" data-value="Elektryka">⚡ Elektryka</button>
+          <button class="chip" data-value="HVAC">❄️ HVAC</button>
+          <button class="chip" data-value="Hydraulika">💧 Hydraulika</button>
+          <button class="chip" data-value="Mechanika">⚙️ Mechanika</button>
+          <button class="chip" data-value="BMS">📡 BMS</button>
+          <button class="chip" data-value="Inne">🔧 Inne</button>
+        </div>
+      </div>
+
       <div class="form-row">
         <div class="form-group flex-1">
           <label for="room-input">Pomieszczenie</label>
@@ -113,9 +140,10 @@
         <label for="category-select">Kategoria usterki</label>
         <select id="category-select">
           <option value="Awaria">🔴 Awaria</option>
-          <option value="Usterka">🟠 Usterka</option>
+          <option value="Usterka" selected>🟠 Usterka</option>
           <option value="Uwaga">🟡 Uwaga</option>
           <option value="Do kontroli">🔵 Do kontroli</option>
+          <option value="OK">🟢 OK</option>
           <option value="Inne">⚪ Inne</option>
         </select>
       </div>
@@ -167,6 +195,20 @@
       </div>
       <div class="modal-body">
         <img id="modal-preview" class="modal-preview" alt="Podgląd zdjęcia">
+
+        <!-- Branch chips in edit modal -->
+        <div class="form-group">
+          <label>Branża</label>
+          <div id="edit-branch-chips" class="chip-group">
+            <button class="chip active" data-value="Elektryka">⚡ Elektryka</button>
+            <button class="chip" data-value="HVAC">❄️ HVAC</button>
+            <button class="chip" data-value="Hydraulika">💧 Hydraulika</button>
+            <button class="chip" data-value="Mechanika">⚙️ Mechanika</button>
+            <button class="chip" data-value="BMS">📡 BMS</button>
+            <button class="chip" data-value="Inne">🔧 Inne</button>
+          </div>
+        </div>
+
         <div class="form-row">
           <div class="form-group flex-1">
             <label for="edit-room">Pomieszczenie</label>
@@ -184,6 +226,7 @@
             <option value="Usterka">🟠 Usterka</option>
             <option value="Uwaga">🟡 Uwaga</option>
             <option value="Do kontroli">🔵 Do kontroli</option>
+            <option value="OK">🟢 OK</option>
             <option value="Inne">⚪ Inne</option>
           </select>
         </div>
@@ -203,10 +246,27 @@
     </div>
   </div>
 
+  <!-- ======================== LIGHTBOX (fullscreen photo viewer) ======================== -->
+  <div id="lightbox" class="lightbox hidden">
+    <div class="lightbox-header">
+      <span id="lightbox-title" class="lightbox-title"></span>
+      <button id="btn-close-lightbox" class="lightbox-close">✕</button>
+    </div>
+    <div class="lightbox-body">
+      <button id="lightbox-prev" class="lightbox-nav lightbox-nav--left">‹</button>
+      <img id="lightbox-img" class="lightbox-img" alt="Podgląd pełnoekranowy">
+      <button id="lightbox-next" class="lightbox-nav lightbox-nav--right">›</button>
+    </div>
+    <div class="lightbox-footer">
+      <span id="lightbox-counter" class="lightbox-counter"></span>
+      <button id="lightbox-edit" class="btn btn-secondary btn-sm">✏️ Edytuj</button>
+    </div>
+  </div>
+
   <!-- ======================== TOAST ======================== -->
   <div id="toast" class="toast hidden"></div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" integrity="sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDFuGLRcnTh6pMcJiAJIQyhl0esHROGhIJvZKdgc/w==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script src="app.js"></script>
 </body>
 </html>
