@@ -194,14 +194,26 @@ async function loadSession() {
 // ── CAMERA ───────────────────────────────────────────────────────────
 const video = $('camera-stream');
 const camTip = $('camera-tip');
+let availableCameras = [];
+let currentCameraIdx = 0;
 
-async function startCamera() {
+async function enumerateCameras() {
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    availableCameras = devices.filter(d => d.kind === 'videoinput');
+  } catch { availableCameras = []; }
+}
+
+async function startCamera(deviceId) {
   stopCamera();
   try {
-    S.stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: S.facing, width: { ideal: 1920 }, height: { ideal: 1080 } },
-      audio: false
-    });
+    const constraints = { audio: false, video: { width: { ideal: 1920 }, height: { ideal: 1080 } } };
+    if (deviceId) {
+      constraints.video.deviceId = { exact: deviceId };
+    } else {
+      constraints.video.facingMode = S.facing;
+    }
+    S.stream = await navigator.mediaDevices.getUserMedia(constraints);
     video.srcObject = S.stream;
     video.classList.remove('hidden');
     $('no-photo-msg').classList.add('hidden');
@@ -210,15 +222,62 @@ async function startCamera() {
     $('btn-capture').classList.remove('recording');
     S.cameraActive = true;
     S.zoomLevel = 1;
+
+    // Enumerate cameras after first access (needs permission)
+    if (!availableCameras.length) await enumerateCameras();
+    updateLensBar();
     initZoom();
   } catch {
     useFallback();
   }
 }
 
+function updateLensBar() {
+  const bar = $('lens-bar');
+  if (availableCameras.length > 1) {
+    bar.replaceChildren();
+    // Filter to back-facing cameras (labels usually contain 'back', 'rear', 'environment', or camera index)
+    const backCams = availableCameras.filter(c =>
+      !c.label || !c.label.toLowerCase().match(/front|user|selfie/)
+    );
+    const camsToShow = backCams.length > 1 ? backCams : availableCameras;
+    camsToShow.forEach((cam, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'lens-btn';
+      // Try to detect lens type from label
+      let label = `${i + 1}`;
+      const lbl = (cam.label || '').toLowerCase();
+      if (lbl.includes('wide') || lbl.includes('ultra') || lbl.includes('0.5')) label = '0.5×';
+      else if (lbl.includes('tele') || lbl.includes('2x') || lbl.includes('zoom')) label = '2×';
+      else if (i === 0 && camsToShow.length > 1) label = '1×';
+      else if (i === 1 && camsToShow.length > 2) label = '2×';
+      else label = `${i + 1}×`;
+
+      btn.textContent = label;
+      btn.dataset.deviceId = cam.deviceId;
+      // Mark current as active
+      const currentTrack = S.stream && S.stream.getVideoTracks()[0];
+      if (currentTrack && currentTrack.getSettings().deviceId === cam.deviceId) {
+        btn.classList.add('active');
+      }
+      btn.addEventListener('click', () => switchLens(cam.deviceId, btn));
+      bar.appendChild(btn);
+    });
+    bar.classList.remove('hidden');
+  } else {
+    bar.classList.add('hidden');
+  }
+}
+
+async function switchLens(deviceId, btn) {
+  $('lens-bar').querySelectorAll('.lens-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  await startCamera(deviceId);
+}
+
 function initZoom() {
   const track = S.stream && S.stream.getVideoTracks()[0];
-  if (!track) { $('zoom-controls').classList.add('hidden'); $('lens-bar').classList.add('hidden'); return; }
+  if (!track) { $('zoom-controls').classList.add('hidden'); return; }
   const caps = track.getCapabilities ? track.getCapabilities() : {};
   if (caps.zoom) {
     const slider = $('zoom-slider');
@@ -228,10 +287,8 @@ function initZoom() {
     slider.value = caps.zoom.min;
     $('zoom-label').textContent = '1.0×';
     $('zoom-controls').classList.remove('hidden');
-    $('lens-bar').classList.remove('hidden');
   } else {
     $('zoom-controls').classList.add('hidden');
-    $('lens-bar').classList.add('hidden');
   }
 }
 
@@ -242,9 +299,6 @@ function applyZoom(val) {
   S.zoomLevel = val;
   $('zoom-label').textContent = Number(val).toFixed(1) + '×';
   $('zoom-slider').value = val;
-  document.querySelectorAll('.lens-btn').forEach(b => {
-    b.classList.toggle('active', parseFloat(b.dataset.zoom) === parseFloat(val));
-  });
 }
 
 function stopCamera() {
@@ -268,6 +322,7 @@ async function flipCamera() {
   isFlipping = true;
   try {
     S.facing = S.facing === 'environment' ? 'user' : 'environment';
+    availableCameras = []; // re-enumerate for new facing
     await startCamera();
   } finally {
     isFlipping = false;
@@ -511,7 +566,7 @@ async function loadGallery() {
   photos.forEach((p, idx) => {
     const item = document.createElement('div');
     item.className = 'gallery-item';
-    const url = URL.createObjectURL(p.originalBlob);
+    const url = URL.createObjectURL(p.processedBlob || p.originalBlob);
     galleryUrls.push(url);
     
     const img = document.createElement('img');
@@ -548,7 +603,7 @@ function renderLightbox() {
   const photos = S.lightboxPhotos;
   if (!photos.length) return;
   const p = photos[S.lightboxIdx];
-  const url = URL.createObjectURL(p.originalBlob);
+  const url = URL.createObjectURL(p.processedBlob || p.originalBlob);
   const prev = $('lightbox-img').dataset.blobUrl;
   if (prev) URL.revokeObjectURL(prev);
   $('lightbox-img').src = url;
@@ -806,9 +861,6 @@ function bindEvents() {
 
   // Zoom
   $('zoom-slider').addEventListener('input', e => applyZoom(parseFloat(e.target.value)));
-  document.querySelectorAll('.lens-btn').forEach(btn => {
-    btn.addEventListener('click', () => applyZoom(parseFloat(btn.dataset.zoom)));
-  });
 
   // Chips
   initChips('branch-chips', v => { S.branch = v; });
