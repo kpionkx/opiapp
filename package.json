@@ -1,0 +1,21 @@
+{
+  "name": "opi-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "OPI – Aplikacja do dokumentowania obchodów technicznych",
+  "scripts": {
+    "build": "node build.js",
+    "cap:sync": "npm run build && npx cap sync",
+    "cap:android": "npm run build && npx cap open android",
+    "cap:build": "npm run build && npx cap sync && cd android && ./gradlew assembleDebug",
+    "serve": "npx -y serve@latest ."
+  },
+  "dependencies": {
+    "@capacitor/core": "^6.0.0",
+    "@capacitor/android": "^6.0.0",
+    "@capgo/camera-preview": "^6.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.0.0"
+  }
+}

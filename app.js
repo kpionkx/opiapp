@@ -53,6 +53,56 @@ const S = {
   lightboxIdx: 0,
 };
 
+// ── DEPARTMENT MAP ────────────────────────────────────────────────────
+const DEPT_MAP = {
+  'Elektryka':   '⚡',
+  'HVAC':        '❄️',
+  'Hydraulika':  '💧',
+  'Mechanika':   '⚙️',
+  'BMS':         '📡',
+  'Inne':        '🔧',
+};
+
+function getDeptIcon(dept) { return DEPT_MAP[dept] || '🔧'; }
+
+function updateDeptHeader(dept) {
+  const el = $('dept-header-name');
+  const icon = $('dept-header-icon');
+  if (el) el.textContent = dept || 'Elektryka';
+  if (icon) icon.textContent = getDeptIcon(dept);
+}
+
+function openDeptSelector() {
+  const current = S.session ? S.session.department : 'Elektryka';
+  const overlay = document.createElement('div');
+  overlay.className = 'bottom-sheet-overlay';
+  overlay.innerHTML = `<div class="bottom-sheet">
+    <div class="bottom-sheet-handle"></div>
+    <div class="bottom-sheet-title">Wybierz dział</div>
+    ${Object.entries(DEPT_MAP).map(([name, icon]) => `
+      <button class="bottom-sheet-option${name === current ? ' active' : ''}" data-dept="${escHtml(name)}">
+        <span class="opt-icon">${icon}</span> ${escHtml(name)}
+        ${name === current ? '<span class="opt-check">✓</span>' : ''}
+      </button>`).join('')}
+  </div>`;
+  overlay.addEventListener('click', e => {
+    const opt = e.target.closest('.bottom-sheet-option');
+    if (opt) {
+      const newDept = opt.dataset.dept;
+      if (S.session) S.session.department = newDept;
+      updateDeptHeader(newDept);
+      // Also update branch chips
+      if (newDept in DEPT_MAP) setChipValue('branch-chips', newDept);
+      S.branch = newDept;
+      overlay.remove();
+      toast(`Dział: ${newDept}`);
+    } else if (e.target === overlay) {
+      overlay.remove();
+    }
+  });
+  document.body.appendChild(overlay);
+}
+
 // ── UTILS ─────────────────────────────────────────────────────────────
 const $  = id => document.getElementById(id);
 const ts = (d = new Date()) => typeof d === 'string' ? new Date(d) : d;
@@ -61,6 +111,7 @@ function fmtTime(d) { d = ts(d); return d.toLocaleTimeString('pl-PL', { hour:'2-
 function fmtDT(d)   { return fmtDate(d) + ' ' + fmtTime(d); }
 function sanitize(s){ return (s||'brak').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').slice(0,20); }
 function pad(n)     { return String(n).padStart(2,'0'); }
+function pad3(n)    { return String(n).padStart(3,'0'); }
 function escHtml(s) {
   return String(s || '')
     .replace(/&/g, '&amp;')
@@ -108,7 +159,8 @@ function hideLoading() {
 }
 
 function updateCounter() {
-  $('photo-count-badge').textContent = S.photoCount;
+  const badge = $('photo-count-badge');
+  if (badge) badge.textContent = S.photoCount;
   document.title = `OPI – ${S.photoCount} zdjęć | ${S.session?.building || ''}`;
 }
 
@@ -342,7 +394,11 @@ function captureFromStream() {
 }
 
 function handleFile(file) {
-  if (!file || !file.type.startsWith('image/')) return;
+  if (!file) return;
+  const allowed = ['image/jpeg','image/png','image/webp'];
+  if (!allowed.includes(file.type)) { toast('Nieobsługiwany format pliku','error'); return; }
+  const MAX_SIZE = 20 * 1024 * 1024; // 20MB
+  if (file.size > MAX_SIZE) { toast('Plik za duży (max 20MB)','error'); return; }
   const reader = new FileReader();
   reader.onload = e => {
     S.currentDataUrl = e.target.result;
@@ -453,15 +509,16 @@ function drawOverlay(ctx, w, h, d) {
     shortDesc || '—',
     fmtDT(timestamp),
   ];
-  const fs = Math.max(16, Math.min(26, Math.floor(w / 45)));
+  const fs = Math.max(18, Math.min(28, Math.floor(w / 40)));
   ctx.font = `bold ${fs}px 'Inter', Arial, sans-serif`;
-  const pd = 12, lh = fs * 1.5;
+  const pd = 14, lh = fs * 1.55;
   const bw = lines.reduce((m, l) => Math.max(m, ctx.measureText(l).width), 0) + pd * 2;
   const bh = lines.length * lh + pd * 2;
   const bx = w - bw - pd;
   const by = h - bh - pd;
-  ctx.fillStyle = 'rgba(0,0,0,0.78)';
-  const r = 8;
+  // Darker background for better contrast
+  ctx.fillStyle = 'rgba(0,0,0,0.88)';
+  const r = 10;
   ctx.beginPath();
   if (ctx.roundRect) {
     ctx.roundRect(bx, by, bw, bh, r);
@@ -474,11 +531,21 @@ function drawOverlay(ctx, w, h, d) {
     ctx.closePath();
   }
   ctx.fill();
-  ctx.fillStyle = '#2563eb';
-  ctx.fillRect(bx, by, bw, 4);
+  // Category color bar
+  const catColors = {'Awaria':'#ef4444','Usterka':'#f97316','Uwaga':'#eab308','Do kontroli':'#3b82f6','OK':'#22c55e','Inne':'#94a3b8'};
+  ctx.fillStyle = catColors[category] || '#6366f1';
+  ctx.fillRect(bx, by, bw, 5);
+  // Text with shadow for readability
+  ctx.shadowColor = 'rgba(0,0,0,0.7)';
+  ctx.shadowBlur = 4;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 1;
   ctx.fillStyle = '#fff';
   ctx.font = `600 ${fs}px 'Inter', Arial, sans-serif`;
   lines.forEach((l, i) => ctx.fillText(l, bx + pd, by + pd + (i + 1) * lh - (lh - fs) * 0.5));
+  // Reset shadow
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
 }
 
 // ── SAVE PHOTO ────────────────────────────────────────────────────────
@@ -486,7 +553,7 @@ let isSaving = false;
 async function savePhoto() {
   if (isSaving) return;
   if (!S.currentDataUrl) { toast('Brak zdjęcia!', 'error'); return; }
-  const shortDesc = $('short-desc').value.trim();
+  const shortDesc = $('short-desc').value.trim().slice(0, 200);
   if (!shortDesc) { toast('Podaj krótki opis!', 'error'); $('short-desc').focus(); return; }
 
   isSaving = true;
@@ -509,7 +576,7 @@ async function savePhoto() {
       processImageNoOverlay(S.currentDataUrl),
     ]);
 
-    const filename = `zdjecie_${pad(num)}_${sanitize(S.session.building)}_pietro${sanitize(floor)}_${sanitize(room)}.jpg`;
+    const filename = `OPI_${pad3(num)}_${sanitize(S.session.building)}_p${sanitize(floor)}_${sanitize(room)}.jpg`;
 
     await idb.put('photos', {
       sessionId: 'current',
@@ -809,25 +876,33 @@ async function copyMailReport() {
 
 // ── EVENT LISTENERS ───────────────────────────────────────────────────
 function bindEvents() {
+  // Onboarding expandable cards
+  document.querySelectorAll('.onboarding-card-header').forEach(header => {
+    header.addEventListener('click', () => {
+      header.closest('.onboarding-card').classList.toggle('expanded');
+    });
+  });
+
   // Start screen
   $('btn-start').addEventListener('click', async () => {
-    const building = $('building-input').value.trim();
+    const building = $('building-input').value.trim().slice(0, 100);
     const dept     = $('department-select').value;
-    const zone     = $('zone-input').value.trim();
+    const zone     = $('zone-input').value.trim().slice(0, 100);
     if (!building) { toast('Podaj nazwę budynku!', 'error'); $('building-input').focus(); return; }
     await saveBuilding(building);
     await startNewSession(building, dept, zone);
-    $('session-building').textContent = building;
-    $('session-dept').textContent     = dept;
+    updateDeptHeader(dept);
     updateCounter();
+    // Show camera hint
+    const hint = $('camera-hint-bubble');
+    if (hint) { hint.classList.remove('hidden'); setTimeout(() => hint.classList.add('hidden'), 5000); }
     showScreen('screen-camera');
     await startCamera();
   });
 
   $('btn-resume').addEventListener('click', async () => {
     if (!S.session) return;
-    $('session-building').textContent = S.session.building;
-    $('session-dept').textContent     = S.session.department;
+    updateDeptHeader(S.session.department);
     updateCounter();
     $('saved-session-banner').classList.add('hidden');
     showScreen('screen-camera');
@@ -844,12 +919,20 @@ function bindEvents() {
     toast('Sesja usunięta');
   });
 
-  // Camera screen
+  // Camera screen - clickable department header
+  $('dept-header').addEventListener('click', openDeptSelector);
+
+  // Back to start button
+  $('btn-back-start').addEventListener('click', () => {
+    if (S.photoCount > 0 && !confirm('Masz niezapisane zdjęcia. Czy na pewno chcesz wrócić?')) return;
+    stopCamera();
+    showScreen('screen-start');
+  });
+
   $('btn-capture').addEventListener('click', () => {
     if (S.stream) captureFromStream();
     else useFallback();
   });
-  $('btn-flip').addEventListener('click', flipCamera);
   $('btn-file-fallback').addEventListener('click', () => $('file-input').click());
   $('file-input').addEventListener('change', e => handleFile(e.target.files[0]));
   $('btn-save-photo').addEventListener('click', savePhoto);

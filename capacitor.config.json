@@ -1,0 +1,13 @@
+{
+  "appId": "pl.opi.obchod",
+  "appName": "OPI Obchód",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "CameraPreview": {
+      "saveToGallery": false
+    }
+  }
+}

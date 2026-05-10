@@ -1,10 +1,11 @@
-const CACHE = 'opi-v2';
+const CACHE = 'opi-v3';
 const MAX_CACHE_SIZE = 50;
 const ASSETS = [
   './',
   './index.html',
   './style.css',
   './app.js',
+  './platform.js',
   './manifest.json'
 ];
 
